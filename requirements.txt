@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+sqlalchemy
+langchain
+langchain-openai
+langchain-core
+langchain-community
+langchain-chroma
+tqdm
+pandas
+openai
+email-validator
+more-itertools
+python-multipart

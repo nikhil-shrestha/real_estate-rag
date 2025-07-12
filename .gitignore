@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.sqlite3
+.env
+.env.*
+*.log
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Docker
+*.pid
+*.seed
+*.bak
+*.tar
+*.db
+
+# LangChain/Chroma
+chroma_db/
+index/
+*.faiss
+
+# Migrations / DB dumps
+*.sql
+*.dump
+
+# Output data
+*.csv
+*.parquet
+*.xlsx
+
+# Uvicorn / Gunicorn logs
+*.pid
+*.log
+
+# Pytest cache
+.pytest_cache/
+.cache/
+
+# MyPy / Pylint / Coverage
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local dev files
+*.local
+*.swp
