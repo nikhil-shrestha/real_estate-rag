@@ -20,11 +20,15 @@ class Config:
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")
     
-    # Email
-    GMAIL_SENDER: Optional[str] = os.getenv("GMAIL_SENDER")
-    GMAIL_PASSWORD: Optional[str] = os.getenv("GMAIL_PASSWORD")
+    # Email / SMTP
     EMAIL_ENABLED: bool = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
-    
+    SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: Optional[str] = os.getenv("SMTP_USERNAME")
+    SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD")
+    EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "Real Estate Assistant")
+    EMAIL_FROM_ADDRESS: Optional[str] = os.getenv("EMAIL_FROM_ADDRESS", SMTP_USERNAME)
+
     # Application
     MAX_RETRIEVAL_DOCS: int = int(os.getenv("MAX_RETRIEVAL_DOCS", "5"))
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
@@ -36,11 +40,11 @@ class Config:
         if not self.OPENAI_API_KEY:
             missing.append("OPENAI_API_KEY")
         
-        if self.EMAIL_ENABLED and not self.GMAIL_SENDER:
-            missing.append("GMAIL_SENDER")
-        
-        if self.EMAIL_ENABLED and not self.GMAIL_PASSWORD:
-            missing.append("GMAIL_PASSWORD")
+        if self.EMAIL_ENABLED:
+            if not self.SMTP_USERNAME:
+                missing.append("SMTP_USERNAME")
+            if not self.SMTP_PASSWORD:
+                missing.append("SMTP_PASSWORD")
         
         if missing:
             raise ValueError(f"Missing required environment variables: {', '.join(missing)}")

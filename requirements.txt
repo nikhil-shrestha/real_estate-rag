@@ -1,16 +1,33 @@
+# Core Framework
 fastapi
-uvicorn
+uvicorn[standard]
+
+# Data Handling
 pydantic
-python-dotenv
+pandas
+python-multipart
+tqdm
+
+# DB and ORM
 sqlalchemy
+email-validator
+
+# Env and Utility
+python-dotenv
+more-itertools
+
+# LangChain and LLMs
 langchain
-langchain-openai
 langchain-core
 langchain-community
+langchain-openai
 langchain-chroma
-tqdm
-pandas
+
+# OpenAI
 openai
-email-validator
-more-itertools
-python-multipart
+
+# For parsing CSV uploads
+aiofiles
+
+# Required for LangChain Chroma backend
+chromadb
