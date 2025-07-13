@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from app.schemas import InquiryRequest
+from app.schemas import InquiryRequest, InquiryResponse
 from app.services.processor import process_inquiry
 import logging
 import asyncio
@@ -55,4 +55,28 @@ def process_batch_inquiries(inquiries: List[InquiryRequest]) -> List[Dict[str, A
     processing_time = time.time() - start_time
     logger.info(f"Batch processing completed in {processing_time:.2f} seconds")
     
+    return results
+  
+
+async def process_batch_async(inquiries: List[InquiryRequest]) -> List[InquiryResponse]:
+    """
+    Asynchronously process a batch of inquiries.
+    Returns a list of InquiryResponse objects.
+    """
+
+    async def safe_process(inquiry: InquiryRequest) -> InquiryResponse:
+        try:
+            result = await asyncio.to_thread(process_inquiry, inquiry)
+            return InquiryResponse(**result)
+        except Exception as e:
+            logger.error(f"Failed to process inquiry {inquiry.email or inquiry.listing_id}: {e}")
+            return InquiryResponse(
+                email=inquiry.email,
+                category="Error",
+                response="Unable to process this inquiry due to internal error."
+            )
+
+    tasks = [safe_process(inquiry) for inquiry in inquiries]
+    results = await asyncio.gather(*tasks)
+
     return results

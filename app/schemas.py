@@ -1,14 +1,19 @@
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
 class InquiryRequest(BaseModel):
-    listing_id: str
-    name: str
-    email: str
-    message: str
-    phone_number: Optional[str] = None
+    inquiry_id: str = Field(..., alias="Inquiry ID")
+    listing_id: str = Field(..., alias="Listing ID")
+    name: str = Field(..., alias="Inquirer Name")
+    email: EmailStr = Field(..., alias="Inquirer Email")
+    message: str = Field(..., alias="Message")
+    date: str = Field(..., alias="Date")
+    phone_number: Optional[str] = Field(None, alias="Phone Number")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class InquiryResponse(BaseModel):
@@ -43,6 +48,17 @@ class BatchInquiryRequest(BaseModel):
         if len(v) == 0:
             raise ValueError('Batch must contain at least one inquiry')
         return v
+
+
+class JobMetadata(BaseModel):
+    job_id: str
+    progress: int
+    total: int
+    status: str
+
+
+class BatchJobResponse(BaseModel):
+    job_id: str
 
 
 class InquiryAnalyticsResponse(BaseModel):

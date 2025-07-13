@@ -4,8 +4,10 @@ import pandas as pd
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.schemas import (
-    InquiryRequest, 
-    InquiryResponse, 
+    BatchJobResponse,
+    JobMetadata,
+    InquiryRequest,
+    InquiryResponse,
     InquiryHistoryResponse,
     BatchInquiryRequest,
     InquiryAnalyticsResponse,
@@ -21,6 +23,7 @@ from sqlalchemy import func, desc, and_
 from datetime import datetime, timedelta
 import logging
 import uuid
+import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -68,14 +71,17 @@ async def process_single_inquiry(
         )
 
 
-@router.post("/process/batch", response_model=List[InquiryResponse])
+# In-memory progress tracker
+job_progress = {}
+
+@router.post("/process/batch", response_model=BatchJobResponse)
 async def process_batch_inquiries_endpoint(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db)
 ):
     """
-    Process multiple inquiries via file upload (CSV or JSON)
+    Process multiple inquiries via file upload (CSV or JSON) and return a job ID.
     """
     try:
         filename = file.filename.lower()
@@ -83,51 +89,78 @@ async def process_batch_inquiries_endpoint(
         if filename.endswith(".csv"):
             contents = await file.read()
             df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
-
-            # Transform CSV rows into InquiryRequest schema
-            inquiries = []
-            for _, row in df.iterrows():
-                try:
-                    inquiry = InquiryRequest(
-                        listing_id=str(row["Listing ID"]),
-                        name=str(row["Inquirer Name"]),
-                        email=str(row["Inquirer Email"]),
-                        message=str(row["Message"]),
-                        phone_number=str(row.get("Phone Number", ""))
-                    )
-                    inquiries.append(inquiry)
-                except Exception as parse_err:
-                    logger.warning(f"Skipping malformed row: {row} — {parse_err}")
+            inquiries = df.to_dict(orient="records")
 
         elif filename.endswith(".json"):
             contents = await file.read()
-            raw = json.loads(contents)
-            inquiries = [InquiryRequest(**item) for item in raw]
+            inquiries = json.loads(contents)
 
         else:
             raise HTTPException(status_code=400, detail="Unsupported file type. Use .csv or .json")
 
-        if not inquiries:
+        inquiry_objs = []
+        for item in inquiries:
+            try:
+                inquiry_objs.append(InquiryRequest(**item))
+            except Exception:
+                continue  # Skip malformed records
+
+        if not inquiry_objs:
             raise HTTPException(status_code=400, detail="No valid inquiries found in file")
 
-        logger.info(f"Processing batch of {len(inquiries)} inquiries from {filename}")
+        job_id = str(uuid.uuid4())
+        job_progress[job_id] = {
+            "progress": 0,
+            "total": len(inquiry_objs),
+            "status": "in_progress",
+            "results": []
+        }
 
-        # Process all inquiries
-        results = process_batch_inquiries(inquiries)
+        def process_with_progress():
+            results = []
+            for idx, inquiry in enumerate(inquiry_objs):
+                try:
+                    result = process_batch_inquiries([inquiry])[0]
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"Failed to process inquiry: {e}")
+                job_progress[job_id]["progress"] = idx + 1
+                job_progress[job_id]["results"] = results
+            job_progress[job_id]["status"] = "completed"
+            background_tasks.add_task(save_batch_inquiries_to_db, inquiries=inquiry_objs, results=results, db_session=db)
 
-        # Save to DB in background
-        background_tasks.add_task(
-            save_batch_inquiries_to_db,
-            inquiries=inquiries,
-            results=results,
-            db_session=db
-        )
+        background_tasks.add_task(process_with_progress)
 
-        return results
+        return BatchJobResponse(job_id=job_id)
 
     except Exception as e:
         logger.exception("Failed to process batch inquiries")
         raise HTTPException(status_code=500, detail=f"Error: {e}")
+
+
+@router.get("/process/batch/jobs", response_model=List[JobMetadata])
+def list_all_batch_jobs_with_metadata():
+    """
+    Returns metadata for all batch jobs.
+    """
+    return [
+        JobMetadata(
+            job_id=job_id,
+            progress=data["progress"],
+            total=data["total"],
+            status=data["status"]
+        )
+        for job_id, data in job_progress.items()
+    ]
+
+@router.get("/process/batch/{job_id}/progress")
+def get_batch_progress(job_id: str):
+    """
+    Retrieve progress for a given batch job
+    """
+    if job_id not in job_progress:
+        raise HTTPException(status_code=404, detail="Job ID not found")
+    return job_progress[job_id]
 
 
 # Inquiry history and tracking endpoints
