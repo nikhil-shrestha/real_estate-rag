@@ -46,6 +46,21 @@ def process_inquiry(request: InquiryRequest) -> dict:
             )
             response = response_chain.invoke(expanded)
             logger.info("Successfully generated response via RAG")
+            status = "success"
+
+            # Step 4: Email the response ONLY if status is success and email is enabled
+            if config.EMAIL_ENABLED:
+                try:
+                    subject = f"Re: Your Real Estate Inquiry - {category}"
+                    send_email_via_agent(
+                        to=request.email,
+                        subject=subject,
+                        body=response
+                    )
+                    logger.info(f"Email successfully sent to {request.email}")
+                except Exception as e:
+                    logger.error(f"Email sending failed for {request.email}: {e}")
+                    status = "failed"  # Optionally downgrade if email fails
 
         except Exception as e:
             logger.error(f"RAG response generation failed: {e}")
@@ -53,24 +68,13 @@ def process_inquiry(request: InquiryRequest) -> dict:
                 "We're currently unable to process your request. "
                 "Please contact support or try again later."
             )
-
-        # Step 4: Email the response if enabled
-        if config.EMAIL_ENABLED:
-            try:
-                subject = f"Re: Your Real Estate Inquiry - {category}"
-                send_email_via_agent(
-                    to=request.email,
-                    subject=subject,
-                    body=response
-                )
-                logger.info(f"Email successfully sent to {request.email}")
-            except Exception as e:
-                logger.error(f"Email sending failed for {request.email}: {e}")
+            status = "failed"
 
         return {
             "email": request.email,
             "category": category,
-            "response": response
+            "response": response,
+            "status": status
         }
 
     except Exception as e:
@@ -81,5 +85,6 @@ def process_inquiry(request: InquiryRequest) -> dict:
             "response": (
                 "An unexpected error occurred while processing your inquiry. "
                 "Please try again later or contact support."
-            )
+            ),
+            "status": "failed"
         }
